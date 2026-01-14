@@ -17,12 +17,23 @@ def verifier_licence_cloud(nom, cle):
     return len(result.data) > 0
 
 def check_license():
-    """Vérifie si le logiciel est déjà activé dans la base de données"""
+    """Vérifie l'activation locale et l'expiration sur Supabase"""
     with sqlite3.connect('boutique.db') as conn:
         c = conn.cursor()
         c.execute("CREATE TABLE IF NOT EXISTS license_config (status TEXT, nom_boutique TEXT)")
         c.execute("SELECT status, nom_boutique FROM license_config")
-        return c.fetchone() # Retourne (Status, Nom) ou None
+        res = c.fetchone()
+        
+        if res and res[0] == "Active":
+            # Si actif localement, on vérifie la date sur Supabase
+            nom_btq = res[1]
+            try:
+                query = supabase.table("licences").select("expire_le").eq("nom", nom_btq).execute()
+                if len(query.data) > 0:
+                    return "Active", nom_btq, query.data[0]['expire_le']
+            except:
+                return "Active", nom_btq, None # En cas d'erreur réseau, on laisse passer
+        return None
 
 def activate_software(nom_saisi, cle_saisie):
     # Cette ligne permet d'accepter votre clé de test OU la clé calculée
@@ -57,14 +68,29 @@ if not licence_info or licence_info[0] != "Active":
     st.stop()# Arrête le code ici tant que ce n'est pas activé
 
 # 2. Si activé, on affiche le nom de la boutique en haut
-nom_de_la_boutique = licence_info[1]
-st.sidebar.subheader(f"🏠 {nom_de_la_boutique.upper()}")
+# --- VÉRIFICATION EXPIRATION & AFFICHAGE ---
+licence_info = check_license()
 
-# ... ICI CONTINUE VOTRE CODE HABITUEL (init_db, login, etc.) ...
+if not licence_info:
+    # ... (Gardez votre bloc d'activation st.title("🛡️ Activation") actuel ici) ...
+    # Une fois activé, n'oubliez pas d'ajouter la ligne expire_le dans Supabase manuellement
+    st.stop()
 
-# --- CONFIGURATION ---
-st.set_page_config(page_title="Développé par Pacy MHA", layout="wide")
+# Si on arrive ici, le logiciel est activé
+status, nom_de_la_boutique, date_exp_str = licence_info
 
+# --- SYSTÈME DE PAIEMENT / EXPIRATION ---
+if date_exp_str:
+    date_expiration = datetime.datetime.strptime(date_exp_str, '%Y-%m-%d').date()
+    aujourdhui = datetime.date.today()
+    jours_restants = (date_expiration - aujourdhui).days
+
+    if jours_restants < 0:
+        st.error(f"🚫 ACCÈS BLOQUÉ : L'abonnement de '{nom_de_la_boutique}' a expiré le {date_exp_str}.")
+        st.info("Veuillez contacter Pacy MUHA au +257 79 799 794 pour le renouvellement.")
+        st.stop() # Arrête tout le logiciel
+    elif jours_restants <= 5:
+        st.sidebar.warning(f"⚠️ Expire dans {jours_restants} jours")
 # --- 1. INITIALISATION ---
 def init_db():
     conn = sqlite3.connect('boutique.db')
@@ -481,6 +507,7 @@ elif menu == "☎️ Aide & Support":
             st.success("Votre demande a été enregistrée. Pacy MHA vous contactera sous peu.")
 
    
+
 
 
 
