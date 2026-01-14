@@ -36,14 +36,20 @@ def check_license():
         return None
 
 def activate_software(nom_saisi, cle_saisie):
-    # Cette ligne permet d'accepter votre clé de test OU la clé calculée
-    if cle_saisie == "PACY-MHA-2024":
-        with sqlite3.connect('boutique.db') as conn:
-            c = conn.cursor()
-            c.execute("DELETE FROM license_config")
-            c.execute("INSERT INTO license_config (status, nom_boutique) VALUES ('Active', ?)", (nom_saisi,))
-            conn.commit()
-        return True
+    try:
+        # On interroge Supabase pour voir si le couple Nom/Clé existe
+        res = supabase.table("licences").select("*").eq("nom", nom_saisi).eq("cle", cle_saisie).execute()
+        
+        if len(res.data) > 0:
+            # Si trouvé, on enregistre l'activation LOCALEMENT dans boutique.db
+            with sqlite3.connect('boutique.db') as conn:
+                c = conn.cursor()
+                c.execute("DELETE FROM license_config")
+                c.execute("INSERT INTO license_config (status, nom_boutique) VALUES ('Active', ?)", (nom_saisi,))
+                conn.commit()
+            return True
+    except Exception as e:
+        st.error(f"Erreur de connexion : {e}")
     return False
 
 # --- DÉMARRAGE DU LOGICIEL ---
@@ -507,6 +513,7 @@ elif menu == "☎️ Aide & Support":
             st.success("Votre demande a été enregistrée. Pacy MHA vous contactera sous peu.")
 
    
+
 
 
 
