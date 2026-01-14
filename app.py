@@ -496,12 +496,29 @@ elif menu == "☎️ Aide & Support":
         """)
         
     with col2:
-        st.success("""
+        # On récupère les infos d'expiration en temps réel sur Supabase
+        try:
+            res = supabase.table("licences").select("expire_le").eq("nom", nom_de_la_boutique).execute()
+            if res.data:
+                date_exp_str = res.data[0]['expire_le']
+                date_expiration = datetime.datetime.strptime(date_exp_str, '%Y-%m-%d').date()
+                aujourdhui = datetime.date.today()
+                jours_restants = (date_expiration - aujourdhui).days
+                
+                status_color = "✅" if jours_restants > 5 else "⚠️"
+                info_abo = f"{status_color} Expire le : {date_exp_str} ({jours_restants} jours restants)"
+            else:
+                info_abo = "ℹ️ Statut non défini"
+        except:
+            info_abo = "❌ Erreur de connexion au serveur de licence"
+
+        st.success(f"""
         ### 🛡️ État du Logiciel
         - **Version :** 1.0.0 (Pro)
-        - **Licence :** ✅ Active pour **{}**
+        - **Boutique :** {nom_de_la_boutique}
+        - **Abonnement :** {info_abo}
         - **Base de données :** Connectée
-        """.format(nom_de_la_boutique))
+        """)
 
     st.divider()
     st.subheader("📩 Envoyer un message rapide")
@@ -513,6 +530,7 @@ elif menu == "☎️ Aide & Support":
             st.success("Votre demande a été enregistrée. Pacy MHA vous contactera sous peu.")
 
    
+
 
 
 
